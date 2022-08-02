@@ -1,47 +1,24 @@
+#-------------IMPORT LIBRARIES----------------------
 from __future__ import print_function
-
 import time
+
+#-------------IMPORT CLASS ROBOT--------------------
 from sr.robot import *
 
-"""
-Exercise 3 python script
+#-------------DEFINING GOLBAL VARIABLES-------------
 
-Put the main code after the definition of the functions. The code should make the robot:
-	- 1) find and grab the closest silver marker (token)
-	- 2) move the marker on the right
-	- 3) find and grab the closest golden marker (token)
-	- 4) move the marker on the right
-	- 5) start again from 1
-
-The method see() of the class Robot returns an object whose attribute info.marker_type may be MARKER_TOKEN_GOLD or MARKER_TOKEN_SILVER,
-depending of the type of marker (golden or silver). 
-Modify the code of the exercise2 to make the robot:
-
-1- retrieve the distance and the angle of the closest silver marker. If no silver marker is detected, the robot should rotate in order to find a marker.
-2- drive the robot towards the marker and grab it
-3- move the marker forward and on the right (when done, you can use the method release() of the class Robot in order to release the marker)
-4- retrieve the distance and the angle of the closest golden marker. If no golden marker is detected, the robot should rotate in order to find a marker.
-5- drive the robot towards the marker and grab it
-6- move the marker forward and on the right (when done, you can use the method release() of the class Robot in order to release the marker)
-7- start again from 1
-
-	When done, run with:
-	$ python run.py solutions/exercise3_solution.py
-
-"""
-
-
-a_th = 2.0
 """ float: Threshold for the control of the linear distance"""
-
-d_th = 0.4
+a_th = 2.3
 """ float: Threshold for the control of the orientation"""
-
-silver = True
-""" boolean: variable for letting the robot know if it has to look for a silver or for a golden marker"""
-
+d_th = 0.4
+""" instance of the class Robot"""  
 R = Robot()
-""" instance of the class Robot"""
+""" int: Maximum frontal distance that the robot must keep from golden tokens""" 
+gold_th=1
+""" float: Threshold for the activation of the grab routine"""
+silver_th=1.5
+
+#-------------DEFINING FUNCTIONS-------------
 
 def drive(speed, seconds):
     """
@@ -70,40 +47,74 @@ def turn(speed, seconds):
     R.motors[0].m1.power = 0
 
 def find_silver_token():
-    """
-    Function to find the closest silver token
-
-    Returns:
-	dist (float): distance of the closest silver token (-1 if no silver token is detected)
-	rot_y (float): angle between the robot and the silver token (-1 if no silver token is detected)
-    """
-    dist=100
+    dist=3
     for token in R.see():
-        if token.dist < dist and token.info.marker_type is MARKER_TOKEN_SILVER:
+        if token.dist < dist and token.info.marker_type is MARKER_TOKEN_SILVER and -70<token.rot_y<70:
             dist=token.dist
-	    rot_y=token.rot_y
-    if dist==100:
-	return -1, -1
+            rot_y=token.rot_y
+    if dist==3:
+        return -1, -1
     else:
-   	return dist, rot_y
+        return dist, rot_y
+   	
+def grab_routine(rot_silver, dist_silver):
+    if dist_silver <= d_th:
+        print("Found it!")
+        if R.grab():
+	        print("Grabbed!")
+        turn(20, 3)
+        drive(15, 0.8)
+        R.release()
+        drive(-15,0.8)
+        turn(-20,3)
+    elif -a_th<=rot_silver<=a_th:
+	    drive(40, 0.5) 
+	    # print("Correct angle")
+    elif rot_silver < -a_th: 
+	    # print("Left a bit...")
+	    turn(-5, 0.3)
+    elif rot_silver > a_th:
+	    # print("Right a bit...")
+	    turn(+5, 0.3)
 
-def find_golden_token():
-    """
-    Function to find the closest golden token
-
-    Returns:
-	dist (float): distance of the closest golden token (-1 if no golden token is detected)
-	rot_y (float): angle between the robot and the golden token (-1 if no golden token is detected)
-    """
-    dist=100
+def turn_dir():
+    left_dist=10
     for token in R.see():
-        if token.dist < dist and token.info.marker_type is MARKER_TOKEN_GOLD:
-            dist=token.dist
-	    rot_y=token.rot_y
-    if dist==100:
-	return -1, -1
-    else:
-   	return dist, rot_y
+        if token.dist < left_dist and token.info.marker_type is MARKER_TOKEN_GOLD and -105<token.rot_y<-75:
+            left_dist=token.dist
+    right_dist=10
+    for token in R.see():
+        if token.dist < right_dist and token.info.marker_type is MARKER_TOKEN_GOLD and 75<token.rot_y<105:
+            right_dist=token.dist
+    if ( left_dist < right_dist ):
+        turn_cloclwise = 1
+    elif (left_dist > right_dist ):
+        turn_cloclwise = -1
+    return turn_cloclwise
 
-while 1:
-    drive(50,2) #we move the robot forward
+def check_wall():
+    dist=1
+    for token in R.see():
+        if token.dist < dist and token.info.marker_type is MARKER_TOKEN_GOLD and -20<token.rot_y<20:
+            dist=token.dist
+    if dist==1:
+        return -1
+    else:
+        return 1
+
+def main():
+    while 1:
+        dist_silver, rot_silver = find_silver_token()
+        is_wall_ahead = check_wall()
+        if (dist_silver>silver_th) or (dist_silver==-1):
+            if (is_wall_ahead == -1):
+                drive(70,0.5)
+            elif (is_wall_ahead == 1):
+                drive(0,0.5)
+                turn_cloclwise = turn_dir()
+                turn(turn_cloclwise*70,0.4)
+        elif dist_silver<silver_th and dist_silver!=-1:
+            grab_routine(rot_silver, dist_silver)
+		    			    		    				
+#-----------------main() CALL-------------------
+main()
